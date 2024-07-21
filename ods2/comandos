@@ -1,0 +1,11 @@
+// Obter saldo inicial
+let initialBalance = await bank.getBalance();
+console.log("Initial Balance:", web3.utils.fromWei(initialBalance.toString(), 'ether'));
+
+// Realizar o depósito
+const receipt = await bank.deposit({ value: web3.utils.toWei('1', 'ether'), from: '0x637e7Cc974059659b8AB59C38Cb524d892B4DC56' });
+console.log("Deposit Receipt:", receipt.logs);
+
+// Obter saldo após o depósito
+let depositBalance = await bank.getBalance();
+console.log("Deposit Balance:", web3.utils.fromWei(depositBalance.toString(), 'ether'));
