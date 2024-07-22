@@ -1,0 +1,23 @@
+// Obter a instância do contrato
+const Banco = artifacts.require("Banco");
+const banco = await Banco.deployed();
+
+const contas = await web3.eth.getAccounts();
+
+// Verificar o saldo inicial
+const saldoInicial = await banco.saldoAtual({ from: contas[0] });
+console.log("Saldo inicial:", web3.utils.fromWei(saldoInicial.toString(), 'ether'));
+
+// Depositar valor
+await banco.depositar({ from: contas[0], value: web3.utils.toWei('8', 'ether') });
+
+// Verificar saldo após depósito
+const saldoAposDeposito = await banco.saldoAtual({ from: contas[0] });
+console.log("Saldo após depósito:", web3.utils.fromWei(saldoAposDeposito.toString(), 'ether'));
+
+// Sacar valor
+await banco.sacar(web3.utils.toWei('1.5', 'ether'), { from: contas[0] });
+
+// Verificar saldo após saque
+const saldoAposSaque = await banco.saldoAtual({ from: contas[0] });
+console.log("Saldo após saque:", web3.utils.fromWei(saldoAposSaque.toString(), 'ether'));
