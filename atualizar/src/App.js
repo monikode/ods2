@@ -1,86 +1,54 @@
-import React, { useState, useEffect } from "react";
-import Web3 from "web3";
-import BancoArtifact from "./contracts/Banco.json";
+import React, { useEffect, useState } from 'react';
+import Web3 from 'web3';
+import BankContract from './contracts/Bank.json';
 
 const App = () => {
-  const [web3, setWeb3] = useState(null);
-  const [banco, setBanco] = useState(null);
-  const [conta, setConta] = useState("");
-  const [saldo, setSaldo] = useState("");
-  const [saldoInicial, setSaldoInicial] = useState("");
-  const [saldoAposDeposito, setSaldoAposDeposito] = useState("");
-  const [saldoAposSaque, setSaldoAposSaque] = useState("");
+  const [account, setAccount] = useState('');
+  const [contract, setContract] = useState(null);
+  const [balance, setBalance] = useState(0);
+  const [amount, setAmount] = useState('');
 
   useEffect(() => {
-    const initWeb3 = async () => {
-      // Configurar Web3
-      const web3Instance = new Web3(
-        Web3.givenProvider || "http://localhost:8545"
+    const init = async () => {
+      const web3 = new Web3(Web3.givenProvider || 'http://localhost:7545');
+      const accounts = await web3.eth.requestAccounts();
+      setAccount(accounts[0]);
+
+      const networkId = await web3.eth.net.getId();
+      const deployedNetwork = BankContract.networks[networkId];
+      const instance = new web3.eth.Contract(
+        BankContract.abi,
+        deployedNetwork && deployedNetwork.address,
       );
-      setWeb3(web3Instance);
+      setContract(instance);
 
-      // Obter contas
-      const contas = await web3Instance.eth.getAccounts();
-      setConta(contas[0]);
-
-      // Obter o contrato
-      const networkId = await web3Instance.eth.net.getId();
-      const deployedNetwork = BancoArtifact.networks[networkId];
-      const contrato = new web3Instance.eth.Contract(
-        BancoArtifact.abi,
-        deployedNetwork && deployedNetwork.address
-      );
-      setBanco(contrato);
-
-      // Verificar saldo inicial
-      const saldo = await contrato.methods
-        .saldoAtual()
-        .call({ from: contas[0] });
-
-        setSaldo(web3Instance.utils.fromWei(saldo, "ether").toString());
-
+      const balance = await instance.methods.balances(accounts[0]).call();
+      setBalance(balance);
     };
 
-    initWeb3();
+    init();
   }, []);
 
-  const depositar = async () => {
-    try {
-      await banco.methods.depositar().send({
-        from: conta,
-        value: web3.utils.toWei("8", "ether"), // Valor reduzido para testes
-        gas: 4712388,
-        gasPrice: 100000000000,
-      });
-      const saldo = await banco.methods.saldoAtual().call({ from: conta });
-      setSaldo(web3.utils.fromWei(saldo, "ether").toString());
-    } catch (error) {
-      console.error("Erro ao depositar:", error);
-    }
+  const handleDeposit = async () => {
+    await contract.methods.deposit().send({ from: account, value: Web3.utils.toWei(amount, 'ether') });
+    const balance = await contract.methods.balances(account).call();
+    setBalance(balance);
   };
 
-  const sacar = async () => {
-    try {
-      await banco.methods.sacar(web3.utils.toWei("1.5", "ether")).send({
-        from: conta,
-        gas: 4712388,
-        gasPrice: 100000000000,
-      });
-      const saldo = await banco.methods.saldoAtual().call({ from: conta });
-      setSaldo(web3.utils.fromWei(saldo, "ether").toString());
-    } catch (error) {
-      console.error("Erro ao sacar:", error);
-    }
+  const handleWithdraw = async () => {
+    await contract.methods.withdraw(Web3.utils.toWei(amount, 'ether')).send({ from: account });
+    const balance = await contract.methods.balances(account).call();
+    setBalance(balance);
   };
 
   return (
     <div>
-      <h1>Banco dApp</h1>
-      <h1>Saldo {saldo} ETH </h1>
-      <div>
-        <button onClick={depositar}>Depositar 8 ETH</button>
-        <button onClick={sacar}>Sacar 1.5 ETH</button>
-      </div>
+      <h1>Bank Transactions DApp</h1>
+      <p>Your account: {account}</p>
+      <p>Balance: {Web3.utils.fromWei(balance, 'ether')} ETH</p>
+      <input type="text" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount in ETH" />
+      <button onClick={handleDeposit}>Deposit</button>
+      <button onClick={handleWithdraw}>Withdraw</button>
     </div>
   );
 };

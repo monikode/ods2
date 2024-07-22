@@ -1,4 +1,23 @@
-// Obter a instância do contrato
+//ganache-cli
+//truffle compile 
+//truffle migrate --network development
+//truffle console --network development
+
+//truffle exec saldoAtual.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Obter a instância do contrato
 const Banco = artifacts.require("Banco");
 const banco = await Banco.deployed();
 
@@ -21,3 +40,4 @@ await banco.sacar(web3.utils.toWei('1.5', 'ether'), { from: contas[0] });
 // Verificar saldo após saque
 const saldoAposSaque = await banco.saldoAtual({ from: contas[0] });
 console.log("Saldo após saque:", web3.utils.fromWei(saldoAposSaque.toString(), 'ether'));
+*/
