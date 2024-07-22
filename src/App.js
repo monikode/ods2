@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import Web3 from "web3";
 import BancoArtifact from "./build/contracts/Banco.json";
+import Button from "@mui/material/Button";
+import Box from "@mui/material/Box";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from "@mui/material";
+
+import PropTypes from "prop-types";
+import { TextField } from "@mui/material";
 
 const App = () => {
   const [web3, setWeb3] = useState(null);
@@ -8,46 +16,52 @@ const App = () => {
   const [conta, setConta] = useState("");
   const [saldo, setSaldo] = useState("");
   const [saldoInicial, setSaldoInicial] = useState("");
-  const [saldoAposDeposito, setSaldoAposDeposito] = useState("");
-  const [saldoAposSaque, setSaldoAposSaque] = useState("");
+  const [value, setValue] = React.useState(0);
+  const [transacoes, setTransacoes] = useState([]);
+
+  const handleChange = (event, newValue) => {
+    setValue(newValue);
+  };
 
   useEffect(() => {
     const initWeb3 = async () => {
-      // Configurar Web3
-      const web3Instance = new Web3(
-        Web3.givenProvider || "http://localhost:8545"
-      );
-      setWeb3(web3Instance);
+      try {
+        const web3Instance = new Web3(
+          Web3.givenProvider || "http://localhost:8545"
+        );
+        setWeb3(web3Instance);
 
-      // Obter contas
-      const contas = await web3Instance.eth.getAccounts();
-      setConta(contas[0]);
+        const contas = await web3Instance.eth.getAccounts();
+        setConta(contas[0]);
 
-      for (let i = 0; i < contas.length; i++) {
-        const saldoGanache = await web3Instance.eth.getBalance(contas[i]);
-        await banco.configurarValorInicial(contas[i], saldoGanache, { from: contas[0] }); 
+        const networkId = await web3Instance.eth.net.getId();
+        console.log(networkId);
+        const deployedNetwork = BancoArtifact.networks[networkId];
+        console.log(BancoArtifact.networks);
+
+        if (!deployedNetwork) {
+          console.error("Contrato não encontrado na rede atual.");
+          return;
+        }
+
+        const contrato = new web3Instance.eth.Contract(
+          BancoArtifact.abi,
+          deployedNetwork.address
+        );
+        setBanco(contrato);
+
+        const saldoAtual = await contrato.methods
+          .saldoAtual()
+          .call({ from: contas[0] });
+        setSaldo(web3Instance.utils.fromWei(saldoAtual, "ether").toString());
+        setSaldoInicial(
+          web3Instance.utils.fromWei(saldoAtual, "ether").toString()
+        );
+
+        extrato()
+      } catch (error) {
+        console.error("Erro ao inicializar Web3:", error);
       }
-      
-
-      // Obter o contrato
-      const networkId = await web3Instance.eth.net.getId();
-      const deployedNetwork = BancoArtifact.networks[networkId];
-      const contrato = new web3Instance.eth.Contract(
-        BancoArtifact.abi,
-        deployedNetwork && deployedNetwork.address
-      );
-      setBanco(contrato);
-
-
-     
-
-      // Verificar saldo inicial
-      const saldo = await contrato.methods
-        .saldoAtual()
-        .call({ from: contas[0] });
-
-      setSaldo(web3Instance.utils.fromWei(saldo, "ether").toString());
-      setSaldoInicial(web3Instance.utils.fromWei(saldo, "ether").toString());
     };
 
     initWeb3();
@@ -55,14 +69,16 @@ const App = () => {
 
   const depositar = async () => {
     try {
+      if (!banco) return;
       await banco.methods.depositar().send({
         from: conta,
-        value: web3.utils.toWei("8", "ether"), // Valor reduzido para testes
-        gas: 4712388,
-        gasPrice: 100000000000,
+        value: web3.utils.toWei("8", "ether"),
+        gas: 8000000,
+        gasPrice: web3.utils.toWei("20", "gwei"),
       });
-      const saldo = await banco.methods.saldoAtual().call({ from: conta });
-      setSaldo(web3.utils.fromWei(saldo, "ether").toString());
+      const saldoAtual = await banco.methods.saldoAtual().call({ from: conta });
+      setSaldo(web3.utils.fromWei(saldoAtual, "ether").toString());
+      extrato()
     } catch (error) {
       console.error("Erro ao depositar:", error);
     }
@@ -70,67 +86,150 @@ const App = () => {
 
   const sacar = async () => {
     try {
+      if (!banco) return;
       await banco.methods.sacar(web3.utils.toWei("1.5", "ether")).send({
         from: conta,
-        gas: 4712388,
-        gasPrice: 100000000000,
+        gas: 8000000,
+        gasPrice: web3.utils.toWei("20", "gwei"),
       });
-      const saldo = await banco.methods.saldoAtual().call({ from: conta });
-      setSaldo(web3.utils.fromWei(saldo, "ether").toString());
+      const saldoAtual = await banco.methods.saldoAtual().call({ from: conta });
+      setSaldo(web3.utils.fromWei(saldoAtual, "ether").toString());
+      extrato()
     } catch (error) {
       console.error("Erro ao sacar:", error);
     }
   };
 
   const extrato = async () => {
+    try {
+      if (!banco) return;
 
-    const contas = await web3.eth.getAccounts();
+      const contas = await web3.eth.getAccounts();
+      const conta = contas[0]; // Pegue a primeira conta
 
-    const eventosDeposito = await banco.getPastEvents("Deposito", {
-      filter: { conta: contas[0] },
-      fromBlock: 0,
-      toBlock: "latest",
-    });
+      // Busque eventos de depósito e saque
+      const eventosDeposito = await banco.getPastEvents("Deposito", {
+        filter: { conta },
+        fromBlock: 0,
+        toBlock: "latest",
+      });
 
-    const eventosSaque = await banco.getPastEvents("Saque", {
-      filter: { conta: contas[0] },
-      fromBlock: 0,
-      toBlock: "latest",
-    });
+      const eventosSaque = await banco.getPastEvents("Saque", {
+        filter: { conta },
+        fromBlock: 0,
+        toBlock: "latest",
+      });
 
-    console.log("Eventos de Depósito:");
-    eventosDeposito.forEach((evento) => {
-      console.log(`- Conta: ${evento.returnValues.conta}`);
-      console.log(
-        `  Valor: ${web3.utils.fromWei(evento.returnValues.valor, "ether")} ETH`
-      );
-      console.log(`  Tx Hash: ${evento.transactionHash}`);
-      console.log(`  Block: ${evento.blockNumber}`);
-      console.log();
-    });
+      // Combine os eventos em uma única lista
+      const transacoesList = eventosDeposito
+        .map((evento) => ({
+          tipo: "deposito",
+          valor: evento.returnValues.valor,
+          data: evento.returnValues.timestamp,
+        }))
+        .concat(
+          eventosSaque.map((evento) => ({
+            tipo: "saque",
+            valor: evento.returnValues.valor,
+            data: evento.returnValues.timestamp,
+          }))
+        );
 
-    console.log("Eventos de Saque:");
-    eventosSaque.forEach((evento) => {
-      console.log(`- Conta: ${evento.returnValues.conta}`);
-      console.log(
-        `  Valor: ${web3.utils.fromWei(evento.returnValues.valor, "ether")} ETH`
-      );
-      console.log(`  Tx Hash: ${evento.transactionHash}`);
-      console.log(`  Block: ${evento.blockNumber}`);
-      console.log();
-    });
+      // Atualize o estado com a lista de transações
+      setTransacoes(transacoesList);
+    } catch (error) {
+      console.error("Erro ao buscar extrato:", error);
+    }
+  };
+
+  function CustomTabPanel(props) {
+    const { children, value, index, ...other } = props;
+
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`simple-tabpanel-${index}`}
+        aria-labelledby={`simple-tab-${index}`}
+        {...other}
+      >
+        {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      </div>
+    );
+  }
+
+  function a11yProps(index) {
+    return {
+      id: `simple-tab-${index}`,
+      "aria-controls": `simple-tabpanel-${index}`,
+    };
+  }
+
+  CustomTabPanel.propTypes = {
+    children: PropTypes.node,
+    index: PropTypes.number.isRequired,
+    value: PropTypes.number.isRequired,
   };
 
   return (
     <div>
-      <h1>Banco dApp</h1>
-      <h1>Saldo {saldo} ETH </h1>
-      <h1>Saldo inicial {saldoInicial} ETH </h1>
-      <div>
-        <button onClick={depositar}>Depositar 8 ETH</button>
-        <button onClick={sacar}>Sacar 1.5 ETH</button>
-        <button onClick={extrato}>extrato</button>
-      </div>
+      <h1>Banco dApp Saldo {saldo} ETH </h1>
+      <Box sx={{ bgcolor: "background.paper" }}>
+        <Tabs value={value} onChange={handleChange} centered>
+          <Tab label="Depositar" />
+          <Tab label="Sacar" />
+          <Tab label="Extrato" />
+        </Tabs>
+      </Box>
+
+      <CustomTabPanel value={value} index={0}>
+        <TextField
+          id="outlined-basic"
+          type="number"
+          label="Valor"
+          variant="outlined"
+        />
+        <Button variant="contained" onClick={depositar}>
+          Depositar
+        </Button>
+      </CustomTabPanel>
+      <CustomTabPanel value={value} index={1}>
+        <TextField
+          id="outlined-basic"
+          type="number"
+          label="Valor"
+          variant="outlined"
+        />
+        <Button variant="contained" onClick={sacar}>
+          Sacar
+        </Button>
+      </CustomTabPanel>
+      <CustomTabPanel value={value} index={2}>
+        <TableContainer component={Paper} style={{ marginTop: 20 }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Tipo</TableCell>
+                <TableCell>Valor (ETH)</TableCell>
+                <TableCell>Data</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {transacoes.map((transacao, index) => (
+                <TableRow key={index}>
+                  <TableCell>{transacao.tipo}</TableCell>
+                  <TableCell>
+                    {web3.utils.fromWei(transacao.valor, "ether")}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(transacao.data * 1000).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </CustomTabPanel>
     </div>
   );
 };
