@@ -18,6 +18,8 @@ const App = () => {
   const [saldoInicial, setSaldoInicial] = useState("");
   const [value, setValue] = React.useState(0);
   const [transacoes, setTransacoes] = useState([]);
+  const [deposito, setDeposito] = useState(1);
+  const [saque, setSaque] = useState(1);
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
@@ -72,7 +74,7 @@ const App = () => {
       if (!banco) return;
       await banco.methods.depositar().send({
         from: conta,
-        value: web3.utils.toWei("8", "ether"),
+        value: web3.utils.toWei(deposito.toString(), "ether"),
         gas: 8000000,
         gasPrice: web3.utils.toWei("20", "gwei"),
       });
@@ -87,7 +89,7 @@ const App = () => {
   const sacar = async () => {
     try {
       if (!banco) return;
-      await banco.methods.sacar(web3.utils.toWei("1.5", "ether")).send({
+      await banco.methods.sacar(web3.utils.toWei(saque.toString(), "ether")).send({
         from: conta,
         gas: 8000000,
         gasPrice: web3.utils.toWei("20", "gwei"),
@@ -188,6 +190,8 @@ const App = () => {
           type="number"
           label="Valor"
           variant="outlined"
+          value={deposito}
+          onChange={(e) => setDeposito(e.target.value)}
         />
         <Button variant="contained" onClick={depositar}>
           Depositar
@@ -199,6 +203,8 @@ const App = () => {
           type="number"
           label="Valor"
           variant="outlined"
+          value={saque}
+          onChange={(e) => setSaque(e.target.value)}
         />
         <Button variant="contained" onClick={sacar}>
           Sacar
