@@ -60,13 +60,13 @@ const App = () => {
           web3Instance.utils.fromWei(saldoAtual, "ether").toString()
         );
 
-        extrato()
       } catch (error) {
         console.error("Erro ao inicializar Web3:", error);
       }
     };
 
     initWeb3();
+    extrato();
   }, []);
 
   const depositar = async () => {
@@ -75,8 +75,8 @@ const App = () => {
       await banco.methods.depositar().send({
         from: conta,
         value: web3.utils.toWei(deposito.toString(), "ether"),
-        gas: 8000000,
-        gasPrice: web3.utils.toWei("20", "gwei"),
+        gas: 4712388,
+        gasPrice: 100000000000,
       });
       const saldoAtual = await banco.methods.saldoAtual().call({ from: conta });
       setSaldo(web3.utils.fromWei(saldoAtual, "ether").toString());
@@ -91,8 +91,8 @@ const App = () => {
       if (!banco) return;
       await banco.methods.sacar(web3.utils.toWei(saque.toString(), "ether")).send({
         from: conta,
-        gas: 8000000,
-        gasPrice: web3.utils.toWei("20", "gwei"),
+        gas: 4712388,
+        gasPrice: 100000000000,
       });
       const saldoAtual = await banco.methods.saldoAtual().call({ from: conta });
       setSaldo(web3.utils.fromWei(saldoAtual, "ether").toString());
@@ -121,6 +121,7 @@ const App = () => {
         fromBlock: 0,
         toBlock: "latest",
       });
+
 
       // Combine os eventos em uma única lista
       const transacoesList = eventosDeposito
